@@ -1,2 +1,4 @@
 ## this is example script for SIMD EWAS
 library(ggplot2)
+
+res <- c(1,3,4,6)
