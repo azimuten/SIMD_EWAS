@@ -6,4 +6,6 @@ res <- c(1,3,4,6)
 res <- res*2
 
 #even more changes
+dataPath <- 'C:/Users/ajesp/Documents/PhD/SIMD_EWAS'
+setwd(dataPath)
 
