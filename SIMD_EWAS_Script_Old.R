@@ -2303,7 +2303,7 @@ saveRDS(SIMD_cov_BMI_Alc_wave, file = "SIMD_cov_BMI_Alc_wave.rds")
 
 #Running the ewas in EDDIE
 
-ssh s0951790@eddie3.ecdf.ed.ac.uk
+ssh s0951790@@eddie3.ecdf.ed.ac.uk
 
 PATH=$PATH:/exports/igmm/eddie/GenScotDepression/local/bin
 source ~/.bash_profile
@@ -2636,20 +2636,146 @@ y
 #copy files to own computer
 scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_output_SIMD_w1.RData C:/Users/ajesp/Documents/PhD/SIMD_EWAS/
 
+
+#make phenotype (rds) file with phenotype, ID and mehtylation ID
+SIMD_predict_pheno_w3 <- readRDS("./SIMD_cov_bmi_alcohol_w3.rds")
+colnames(SIMD_predict_pheno_w3)[1] <- "ID"
+
+wave3_sentrix <- readRDS("./wave3_sentrix.rds")
+colnames(wave3_sentrix)[1] <- "ID"
+
+SIMD_predict_pheno_w3 <- merge(SIMD_predict_pheno_w3[,1], wave3_sentrix[,c(1,4)], by = "ID")
+SIMD_predict_pheno_w3 <- SIMD_predict_pheno_w3[,c(1,14)]
+
+SIMD_predict_pheno_w3 <- merge(genscot_merged[,c("ID", "rank")], SIMD_predict_pheno_w3, by = "ID")
+colnames(SIMD_predict_pheno_w3)[1] <- "gwas"
+colnames(SIMD_predict_pheno_w3)[2] <- "pheno"
+colnames(SIMD_predict_pheno_w3)[3] <- "ID"
+
+saveRDS(SIMD_predict_pheno_w3, file = "SIMD_predict_pheno_w3.rds")
+
+##In Eddie
+#Copy files into Eddie scratch space
+scp C:/Users/ajesp/Documents/PhD/SIMD_EWAS/SIMD_predict_pheno_w3.rds s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
   
+  #requesting more memory
+  qlogin -l h_vmem=128G
+
+#Opening R
+module load igmm/apps/R/3.6.3
+R
+
+data  <- read.table("/exports/igmm/eddie/GenScotDepression/miruna/EWAS_Jan/carmen_data/mvalues_txt/mvalues_450/all_450mvalues.txt")
+names(data) <- substring(names(data),2,20)
+
+dep_test  <- readRDS("/exports/eddie/scratch/s0951790/SIMD_predict_pheno_w3.rds")
+
+a = which(colnames(data) %in% dep_test$ID)
+meth = data[,a]
+rm(data)
+dat = meth
+rm(meth)
+
+meth = t(dat)
+rm(dat)
+meth1 = as.data.frame(meth)
+meth1$id = as.character(rownames(meth1)) 
+
+## Read in LASSO coefficients, which contain coef.name (CpG site); coef.value (CpG weight) --> this was derived in Generation Scotland wave 1
+
+load("/exports/eddie/scratch/s0951790/Lasso_coef_SIMD_w1.RData") 
+a = which(names(meth1) %in% coef$coef.name)
+meth2 = meth1[,a]
+meth3 = t(meth2)
+probes <- intersect(coef$coef.name, rownames(meth3))
+rownames(coef) = coef$coef.name
+
+b = meth3[probes,]
+p = coef[probes,]
+
+for (i in probes) {
+  b[i,]= b[i,]*p[i,"coef.value"]
+}
+
+predicted_dep=colSums(b) + coef[1,2] 
+pred_dep = as.data.frame(predicted_dep)
+pred_dep$ID = rownames(pred_dep)
+
+dep = merge(dep_test, pred_dep, by="ID")
+
+## Save this dataset with antidep_wave3_scores.Rdata (or whichever name you want); this should have: participant ID; depression status; DNAm risk score as columns
+
+save(dep, file="/exports/eddie/scratch/s0951790/SIMD_w3_DNAm_scores.RData") 
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/SIMD_w3_DNAm_scores.RData C:/Users/ajesp/Documents/PhD/SIMD_EWAS/
+
+load("./SIMD_w3_DNAm_scores.RData")
+View(dep)
 
 
-## Accessing ALSPAC DNAm data folder on Eddie####
+##ROC tutorial
 
-ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddke shell
-qlogin -q staging #qlogin staging needed to access datastore
-qlogin -l h_vmem=128G #requesting more memory
-cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/ #change directory to the ALSPAC DNAm data path
-cd ./betas #change directory to the folder with the data I need
-module load igmm/apps/R/3.6.3 #loading R
-R #opening R
-load("mvals.Robj") #loading the m-value file into R
+install.packages("pROC")
+library(pROC)
+install.packages("randomForest")
+library(randomForest)
+
+#use the roc function with known value first and estimate second.
+roc(dep$pheno, dep$predicted_dep, plot=TRUE)
+#didnt work because this is not a binary variable.
+
+#Trying to use multiclass.roc instead
+multiclass.roc(dep$pheno, dep$predicted_dep, plot = F)
+#
+
+
+################ Rural living and depression ################################
+install.packages("readxl")
+library(readxl)
+SIMD_urban_rural <- read_excel("~/PhD/SIMD_EWAS/SIMD urban rural.xlsx")
+colnames(SIMD_urban_rural)[1] <- "ID"
 
 
 
+urban_depression <- genscot_merged[,c("ID", "dep_status", "inflam_disease", "rank", "bmi", "age", "sex")]
+
+urban_depression <- merge(urban_depression, SIMD_urban_rural[,c(1,4)], by = "ID")
+urban_depression$dep_status <- as.factor(urban_depression$dep_status)
+urban_depression$urban <- as.factor(urban_depression$urban)
+
+
+
+fit <- glm(inflam_disease ~ urban + rank + age + sex, data = urban_depression)
+summary(fit)
+
+fit <- glm(inflam_disease ~ urban + age + sex, data = urban_depression, family = binomial())
+summary(fit)
+
+fit <- glm(dep_status ~ urban + rank + age + sex, data = urban_depression, family = binomial())
+summary(fit)
+
+fit <- glm(dep_status ~ inflam_disease + rank + age + sex, data = urban_depression, family = binomial())
+summary(fit)
+
+
+cor.test(urban_depression$rank, urban_depression$urban, method = "pearson")
+cor.test(urban_depression$urban, urban_depression$, method = "pearson")
+
+
+cor.test(genscot_merged$rank, genscot_merged$Bcell, method = "pearson")
+
+
+
+######## SIMD and depression regression
+genscot_merged$dep_status <- as.factor(genscot_merged$dep_status)
+
+SIMD_MDD <- genscot_merged[,c("ID", "ever_smoke", "pack_years", "dep_status", "rank", "quintile", "bmi", "age", "sex")]
+SIMD_MDD <- merge(SIMD_MDD, Alcohol[,c("ID", "units")], by = "ID")
+colnames(SIMD_MDD) [10] <- "Units"
+base.model <- glm(dep_status ~ rank, data = SIMD_MDD, family=binomial())
+summary(base.model)
+full.model <- glm(dep_status ~ rank + Units + pack_years + bmi + age + sex, data = SIMD_MDD, family=binomial())
+summary(full.model)
+
+full.model.q <- glm(dep_status ~ quintile + Units + pack_years + bmi + age + sex, data = SIMD_MDD, family=binomial())
+summary(full.model.q)
 
