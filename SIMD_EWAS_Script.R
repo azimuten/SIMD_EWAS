@@ -2641,15 +2641,25 @@ scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_output_SI
 
 ## Accessing ALSPAC DNAm data folder on Eddie####
 
-ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddke shell
+ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
 qlogin -q staging #qlogin staging needed to access datastore
-qlogin -l h_vmem=128G #requesting more memory
 cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/ #change directory to the ALSPAC DNAm data path
 cd ./betas #change directory to the folder with the data I need
 
-
 scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas/mvals.Robj s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ #Copy m-value file into scratch space
+
+cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/samplesheet #changing directory to samplesheet location
+module load igmm/apps/R/3.6.3 #loading R
+R #opening R
+load("data.Robj") #loading samplesheet data into R
+head(samplesheet) #viweing the first 6 lines of the samplesheet
+q() #ending R session
+n #I dont want to save the work sheet
+scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/samplesheet/data.Robj s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ #copy samplesheet with timepoints to scratch space
+
+
 qlogin -l h_vmem=128G #requesting more memory
+cd s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ #changing directory to my scratch space
 module load igmm/apps/R/3.6.3 #loading R
 R #opening R
 load("mvals.Robj") #loading the m-value file into R
