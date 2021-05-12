@@ -2646,10 +2646,12 @@ qlogin -q staging #qlogin staging needed to access datastore
 qlogin -l h_vmem=128G #requesting more memory
 cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/ #change directory to the ALSPAC DNAm data path
 cd ./betas #change directory to the folder with the data I need
+
+
+scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas/mvals.Robj s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ #Copy m-value file into scratch space
+qlogin -l h_vmem=128G #requesting more memory
 module load igmm/apps/R/3.6.3 #loading R
 R #opening R
 load("mvals.Robj") #loading the m-value file into R
-
-
 
 
