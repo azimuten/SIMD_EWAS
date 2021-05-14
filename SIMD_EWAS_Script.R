@@ -2643,8 +2643,7 @@ scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_output_SI
 
 ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
 qlogin -q staging #qlogin staging needed to access datastore
-cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/ #change directory to the ALSPAC DNAm data path
-cd ./betas #change directory to the folder with the data I need
+cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas #change directory to the ALSPAC DNAm beta data path
 
 scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas/mvals.Robj s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ #Copy m-value file into scratch space
 
@@ -2655,7 +2654,7 @@ load("data.Robj") #loading samplesheet data into R
 head(samplesheet) #viweing the first 6 lines of the samplesheet
 q() #ending R session
 n #I dont want to save the work sheet
-scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/samplesheet/data.Robj s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ #copy samplesheet with timepoints to scratch space
+scp ./data.Robj /exports/eddie/scratch/s0951790/ #copy samplesheet with timepoints to scratch space
 
 
 qlogin -l h_vmem=128G #requesting more memory
