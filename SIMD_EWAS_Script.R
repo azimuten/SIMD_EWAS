@@ -2685,3 +2685,26 @@ FOM_mvals <- subset(mvals_na, select = c(Sample_Name))
 #save the subsetted cpg data-frame
 saveRDS(FOM_mvals, file = "FOM_mvals.rds")
 
+
+##creating the testing data (ALSPAC) phenotype file
+#It needs to include participant ID (cid...), phenotype (IMD score), and methylation ID (SLIDE.....).
+
+ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
+qlogin -q staging #qlogin staging needed to access datastore
+cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/ #changing directory to where the phenotype file (Whalley_07May2021.dta) is
+scp ./Whalley_07May2021.dta /exports/eddie/scratch/s0951790/ #copying the phenotypefile to my scratch space
+module load igmm/apps/R/3.6.3 #loading R
+R #opening R
+install.packages("haven") #this package is needed to open a stata file in R
+library(haven)
+alspac_pheno <- read_dta("Whalley_07May2021.dta") #loading the phenotypefile into a dataframe callen alspac_pheno
+names(alspac_pheno)[1:10]
+alspac_pheno_IMD <- alspac_pheno[,c("cidB3421", "jan2014imd2010q5_M")]
+saveRDS(alspac_pheno_IMD, file = "alspac_pheno_IMD.rds")
+
+
+
+
+
+
+
