@@ -2700,7 +2700,72 @@ library(haven)
 alspac_pheno <- read_dta("Whalley_07May2021.dta") #loading the phenotypefile into a dataframe callen alspac_pheno
 names(alspac_pheno)[1:10]
 alspac_pheno_IMD <- alspac_pheno[,c("cidB3421", "jan2014imd2010q5_M")]
+alspac_pheno_IMD <- merge (alspac_pheno_IMD, samplesheet[,c("Sample_Name", "cidB3421")], by = "cidB3421") #add methylation ID to the phenotype file
 saveRDS(alspac_pheno_IMD, file = "alspac_pheno_IMD.rds")
+
+
+### Running the prediction lasso regression in the ALSPAC data
+
+#copy coefficient file onto scratch space from own computer
+
+
+ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
+qlogin -l h_vmem=128G #requesting more memory
+cd /exports/eddie/scratch/s0951790/ #changing directory to my scratch space
+  module load igmm/apps/R/3.6.3 #loading R
+R #opening R
+
+#
+
+#load the raw methylation data set (for mothers) in R
+data <- readRDS("FOM_mvals.rds")
+
+names(data) <- substring(names(data),2,20) #Don't know what this does
+
+#load the phenotype file
+IMD_test <- readRDS("alspac_pheno_IMD.rds")
+
+#Don't know what this section does
+a = which(colnames(data) %in% IMD_test$Sample_Name)
+meth = data[,a]
+rm(data)
+dat = meth
+rm(meth)
+meth = t(dat)
+rm(dat)
+meth1 = as.data.frame(meth)
+meth1$cidB3421 = as.character(rownames(meth1))
+
+
+load ("./Lasso_output_SIMD_w1.RData") #loading the list of CpGs and their weights (coefficients) that were created in the training set
+
+#Don't know what this section does
+a = which(names(meth1) %in% coef$coef.name)
+meth2 = meth1[,a]
+meth3 = t(meth2)
+probes <- intersect(coef$coef.name, rownames(meth3))
+rownames(coef) = coef$coef.name
+
+b = meth3[probes,]
+p = coef[probes,]
+
+
+#this section calculates the DNAm risk scores 
+#(a sum of the product of the coefficient weights derived from the LASSO regression and m-values)
+for (i in probes) {
+  b[i,]= b[i,]*p[i,"coef.value"]
+}
+
+predicted_dep=colSums(b) + coef[1,2]
+pred_dep = as.data.frame(predicted_dep)
+pred_dep$ID = rownames(pred_dep)
+
+dep = merge(dep_test, pred_dep, by="ID")
+
+#save the file to my scratch space
+save(dep, file = "/exports/eddie/scratch/s0951790/ALSPAC_pred_IMD.RData")
+
+
 
 
 
