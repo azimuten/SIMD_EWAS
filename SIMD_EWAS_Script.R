@@ -2558,15 +2558,138 @@ write.csv(SIMD_lasso_pheno_w1, file = "SIMD_lasso_pheno_w1.csv")
 #save penotype df as a SIMD_lasso_pheno_w1.txt file
 write.table(SIMD_lasso_pheno_w1, file = "SIMD_lasso_pheno_w1.txt")
 
-##In Eddie
-  #Copy files into Eddie scratch space
-  scp C:/Users/ajesp/Documents/PhD/SIMD_EWAS/SIMD_lasso_pheno_w1.txt s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
 
+
+
+
+
+
+
+
+
+
+
+#############        Making a phenotype file for both W1 and W3
+setwd("/Users/andersjespersen/Documents/SIMD_EWAS/")
+
+genscot_merged <- read.csv("./genscot_merged.csv")
+SIMD_lasso_cov_w1 <- readRDS("./SIMD_cov_bmi_alcohol_w1.rds") #loading covariate file for GS w1
+SIMD_lasso_cov_w3 <- readRDS("./SIMD_cov_bmi_alcohol_w3.rds") #loading covariate file for GS w3
+PCs_w1 <- readRDS("./Factominer_PCs_5087_resid_PC100.rds") #loading Principal Components file for GS w1
+PCs_w3 <- readRDS("./wave3_pcs.rds") #loading Principal Components file for GS w3
+
+
+IDinfo_w1 <- read.table("./IDinfo.csv", header=TRUE, sep=",") #loading methylation and participant ID file for GS w1
+IDinfo_w3 <- readRDS("./wave3_sentrix.rds") #loading methylation and participant ID file for GS w1
+
+#Reconfiguring the methylation ID to match the one in the w1 PC df
+IDinfo_w1$Sentrix_Position <- sub("^", "_", IDinfo_w1$Sentrix_Position )
+IDinfo_w1$SampleID <- paste0(IDinfo_w1$Sentrix_ID, IDinfo_w1$Sentrix_Position)
+#Merging w1 IDinfo and w1 PC df
+PCs_w1 <- merge(PCs_w1, IDinfo_w1[,c("Sample_Name", "SampleID")], by.x = "Sample_Sentrix_ID", by.y = "SampleID")
+#renaming the ID column
+colnames(PCs_w1)[102] <- "ID"
+
+#Reconfiguring the methylation ID to match the one in the w3 PC df
+IDinfo_w3$Sentrix_Position <- sub("^", "_", IDinfo_w3$Sentrix_Position )
+IDinfo_w3$SampleID <- paste0(IDinfo_w3$Sentrix_ID, IDinfo_w3$Sentrix_Position)
+
+#Merging w1 IDinfo and w1 PC df
+PCs_w3 <- merge(PCs_w3, IDinfo_w3[,c("id", "SampleID")], by.x = "Sample_Sentrix_ID", by.y = "SampleID")
+#renaming the ID column
+colnames(PCs_w3)[102] <- "ID"
+
+
+
+## Wave 1 phenotype file:
+
+colnames(SIMD_lasso_cov_w1)[1] <- "ID" #renaming the ID column
+SIMD_lasso_cov_w1 <- merge(SIMD_lasso_cov_w1,  genscot_merged[,c("ID", "rank")], by = "ID") #adding SIMD rank to the w1 covariate df
+SIMD_lasso_cov_w1 <- merge(SIMD_lasso_cov_w1, PCs_w1[,c(2:11, 102)], by = "ID") #Adding the first 10 PCs to the w1 covariate df
+SIMD_lasso_cov_w1_na <-na.omit(SIMD_lasso_cov_w1) # making a new df that excludes any participants with missing data
+
+#regressing the covariates on SIMD rank in w1
+SIMD_lasso_w1_lm <- lm(rank ~ ever_smoke + pack_years + bmi + usual + sex + age + PC1:PC10, data = SIMD_lasso_cov_w1_na)
+SIMD_lasso_w1_res <- data.frame(resid(SIMD_lasso_w1_lm)) #saving the residuals in a df
+SIMD_lasso_cov_w1_na$resid <- resid(SIMD_lasso_w1_lm) #adding this residuals info to the no missing data covariate df
+SIMD_lasso_cov_w1 <-SIMD_lasso_cov_w1_na #making the the no missing data covariate df the main covariate df
+
+colnames(IDinfo_w1)[1] <- "ID" #renaming the ID column
+SIMD_lasso_cov_w1 <- merge(SIMD_lasso_cov_w1, IDinfo_w1[,c(1,4)], by = "ID") #adding mehtyaltion ID to the covariate file
+
+#renaming columns to fit the lasso regression code
+SIMD_lasso_pheno_w1 <- SIMD_lasso_cov_w1[,c(1,19,20)]
+colnames(SIMD_lasso_pheno_w1)[1] <- "gwas"
+colnames(SIMD_lasso_pheno_w1)[2] <- "pheno"
+colnames(SIMD_lasso_pheno_w1)[3] <- "ID"
+write.csv(SIMD_lasso_pheno_w1, file = "SIMD_lasso_pheno_w1.csv")
+
+
+
+
+##Wave 3 phenotype file:
+
+colnames(SIMD_lasso_cov_w3)[1] <- "ID" #renaming the ID column
+SIMD_lasso_cov_w3 <- merge(SIMD_lasso_cov_w3,  genscot_merged[,c("ID", "rank")], by = "ID") #adding SIMD rank to the w3 covariate df
+SIMD_lasso_cov_w3 <- merge(SIMD_lasso_cov_w3, PCs_w3[,c(2:11, 102)], by = "ID") #Adding the first 10 PCs to the w3 covariate df
+SIMD_lasso_cov_w3_na <-na.omit(SIMD_lasso_cov_w3) # making a new df that excludes any participants with missing data
+
+#regressing the covariates on SIMD rank in w1
+SIMD_lasso_w3_lm <- lm(rank ~ ever_smoke + pack_years + bmi + usual + sex + age + PC1:PC10, data = SIMD_lasso_cov_w3_na)
+SIMD_lasso_w3_res <- data.frame(resid(SIMD_lasso_w3_lm)) #saving the residuals in a df
+SIMD_lasso_cov_w3_na$resid <- resid(SIMD_lasso_w3_lm) #adding this residuals info to the no missing data covariate df
+SIMD_lasso_cov_w3 <-SIMD_lasso_cov_w3_na #making the the no missing data covariate df the main covariate df
+
+colnames(IDinfo_w3)[1] <- "ID" #renaming the ID column
+SIMD_lasso_cov_w3 <- merge(SIMD_lasso_cov_w3, IDinfo_w3[,c(1,4)], by = "ID") #adding mehtyaltion ID to the covariate file
+
+#renaming columns to fit the lasso regression code
+SIMD_lasso_pheno_w3 <- SIMD_lasso_cov_w3[,c(1,25,26)]
+colnames(SIMD_lasso_pheno_w3)[1] <- "gwas"
+colnames(SIMD_lasso_pheno_w3)[2] <- "pheno"
+colnames(SIMD_lasso_pheno_w3)[3] <- "ID"
+write.csv(SIMD_lasso_pheno_w3, file = "SIMD_lasso_pheno_w3.csv")
+
+
+#€concatonate the two phenotype dataframes
+SIMD_lasso_pheno <-rbind(SIMD_lasso_pheno_w3,SIMD_lasso_pheno_w1)
+
+
+#save penotype df as a SIMD_lasso_pheno.txt file
+write.table(SIMD_lasso_pheno, file = "SIMD_lasso_pheno.txt")
+
+
+
+
+
+
+
+
+
+
+
+
+##In Terminal
+  #Copy files into Eddie scratch space
+  scp /Users/andersjespersen/Documents/SIMD_EWAS/SIMD_lasso_pheno.txt s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
+    
+  scp /Users/andersjespersen/Documents/SIMD_EWAS/SIMD_lasso_pheno_w1.txt s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
+    
+##In Eddie
+
+  #opening Eddie
+  ssh s0951790@eddie.ecdf.ed.ac.uk
+    
   #requesting more memory
   qlogin -l h_vmem=128G
+  
+  #Change directory to scratch space
+  cd /exports/eddie/scratch/s0951790/
 
   #Opening R
-  module load igmm/apps/R/3.6.3
+  module load igmm/apps/R/4.1.0
+  
+  R
 
 #####Lasso script from Miruna (edited)
 
@@ -2577,6 +2700,7 @@ write.table(SIMD_lasso_pheno_w1, file = "SIMD_lasso_pheno_w1.txt")
   #when the actual Rscript runs
 
 install.packages("glmnet")
+69 #choosing whihch cloud to store the package in (69 is UK Bristol)
 
 ## RSCRIPT FOR LASSO
 ## LASSO prediction in GS 5K 1st wave
@@ -2586,15 +2710,13 @@ library(glmnet)
 library(methods)
 args=commandArgs(TRUE)
 
-clean_beta  <- read.table("/exports/igmm/eddie/GenScotDepression/miruna/EWAS_Jan/carmen_data/mvalues_txt/mvalues_450/all_450mvalues.txt")
+clean_beta  <- read.table("/exports/igmm/eddie/GenScotDepression/data/genscot/methylation/mvalues_carmen/mval_450/all_450mvalues.txt")
+
+#names(clean_beta)[1:10]
 
 names(clean_beta) <- substring(names(clean_beta),2,20) 
 
-phenotype_file  <- read.table("/exports/eddie/scratch/s0951790/SIMD_lasso_pheno_w1.txt",header=T)
-
-# input files
-# clean_beta <- readRDS("/exports/eddie/scratch/tclarke2/pre_norm_beta_vals_clean450.Rdata")
-# phenotype_file <- read.table("/exports/eddie/scratch/tclarke2/residual_phenos.txt", header=T)
+phenotype_file  <- read.table("/exports/eddie/scratch/s0951790/SIMD_lasso_pheno.txt",header=T)
 
 # subset methylation data according to whether they have the predictor of interest
 # phenotypes should be in the SENTRIXPLATE_SENTRIXPOSITION format and not GWAS id
@@ -2610,13 +2732,19 @@ dep1 = pheno[match(ids, pheno$ID),]
 y = dep1$pheno
 # remove columns with NAs as glmnet can't use missing data
 x1 = tclean_beta[,apply(tclean_beta, 2, function(tar) !any(is.na(tar)))]
-rm(tclean_beta) 
+rm(tclean_beta)
+
+
 
 set.seed(1.234)
 
 # Cross-validation: find the best shrinkage value - the alpha=1 means it's a LASSO model
 lasso.cv <- cv.glmnet(x1, y, alpha=1, nfolds=10)
-save(lasso.cv, file="/exports/eddie/scratch/s0951790/Lasso_output_SIMD_w1.RData") 
+
+#Error in elnet(xd, is.sparse, ix, jx, y, weights, offset, type.gaussian,  : long vectors (argument 5) are not supported in .Fortran
+#I think the error is becasue the prediciton sample is too large for R to deal with. Ran it on half the sample and there were no problems.
+
+save(lasso.cv, file="/exports/eddie/scratch/s0951790/Lasso_output_SIMD.RData") 
 
 lambda.min = lasso.cv$lambda.min
 m = glmnet(x1,y,lambda=lambda.min)
@@ -2626,29 +2754,147 @@ test = data.frame(coef.name = dimnames(coef(m))[[1]], coef.value = matrix(coef(m
 
 # only take predictors where the co-efficient value is not 0
 coef = test[test$coef.value!=0,]
-save(coef, file="/exports/eddie/scratch/s0951790/Lasso_coef_SIMD_w1.RData") 
+save(coef, file="/exports/eddie/scratch/s0951790/Lasso_coef_SIMD.RData") 
 
 #End R and save workspace
 q()
 y
 
 
-#copy files to own computer
-scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_output_SIMD_w1.RData C:/Users/ajesp/Documents/PhD/SIMD_EWAS/
+#Outside Eddie, in Terminal:  copy files to own computer
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_output_SIMD_w1.RData /Users/andersjespersen/Documents/SIMD_EWAS/
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_coef_SIMD_w1.RData /Users/andersjespersen/Documents/SIMD_EWAS/
+  
+  
 
+  
+#################    Lasso script adapted for big lasso   #################################################################
+  
+#opening Eddie
+ssh s0951790@eddie.ecdf.ed.ac.uk
+
+#requesting more memory
+qlogin -l h_vmem=128G
+
+#Change directory to scratch space
+cd /exports/eddie/scratch/s0951790/
+  
+#Loading R
+module load igmm/apps/R/4.1.0
+
+#Opening R
+R
+
+
+  #-	FIRST, you need to open an R session and install.packages("glmnet"); 
+  #this is because you need to interact with the installation (choose your own library 
+  #from a drop down list supplied by R); then close the R session 
+  #(but save the workspace when prompted by R); this will allow you to "library(glmnet)" 
+  #when the actual Rscript runs
+
+install.packages("glmnet")
+install.packages("biglasso")
+install.packages("bigstatsr")
+69 #choosing whihch cloud to store the package in (69 is UK Bristol)
+
+## RSCRIPT FOR LASSO
+## LASSO prediction in GS 5K 1st wave
+# Pre-normalized beta values have been cleaned for unsuitable probes using Prep_LASSO_TKC.R
+install.packages("methods")
+library(biglasso)
+library(glmnet)
+library(methods)
+library(bigstatsr)
+args=commandArgs(TRUE)
+
+clean_beta  <- read.table("/exports/igmm/eddie/GenScotDepression/data/genscot/methylation/mvalues_carmen/mval_450/all_450mvalues.txt")
+
+#names(clean_beta)[1:10]
+
+names(clean_beta) <- substring(names(clean_beta),2,20) 
+
+phenotype_file  <- read.table("/exports/eddie/scratch/s0951790/SIMD_lasso_pheno.txt",header=T)
+
+# subset methylation data according to whether they have the predictor of interest
+# phenotypes should be in the SENTRIXPLATE_SENTRIXPOSITION format and not GWAS id
+pheno <- phenotype_file[!is.na(phenotype_file$pheno),]
+a = which(colnames(clean_beta) %in% pheno$ID)
+clean_beta1 = clean_beta[,a]
+rm(clean_beta)
+tclean_beta = t(clean_beta1)
+rm(clean_beta1)
+
+ids = rownames(tclean_beta)
+dep1 = pheno[match(ids, pheno$ID),]
+y = dep1$pheno
+# remove columns with NAs as glmnet can't use missing data
+x1 = tclean_beta[,apply(tclean_beta, 2, function(tar) !any(is.na(tar)))]
+rm(tclean_beta)
+
+
+#### code from Shen
+big_meth <- bigstatsr::as_FBM(x1, backingfile = "test")
+(desc <- sub("\\.bk$", ".desc", big_meth$backingfile))
+dput(big_meth$bm.desc(), desc)
+
+X <- attach.big.matrix(desc)
+#Error in attach.resource(info, path = NULL, ...) : 
+#Fatal error in attach: big.matrix could not be attached.
+
+cvfit <- cv.biglasso(X, y, seed = 1234, nfolds = 10, ncores = 2)
+out <- as.data.frame(cbind(rownames(coef(cvfit))[which(coef(cvfit) != 0)], coef(cvfit)[which(coef(cvfit) != 0)]))
+
+out1 <- out[-1,]## no need to use the intercept if trained on residuals
+write.table(out1, file=output.name, quote=F, row.names=F, col.names=F)
+
+####
+
+
+
+
+# Cross-validation: find the best shrinkage value - the alpha=1 means it's a LASSO model
+#lasso.cv <- cv.biglasso(x.bm, y, seed = 1.234, alpha=1, nfolds=10)
+
+save(cvfit, file="/exports/eddie/scratch/s0951790/Lasso_output_SIMD.RData") 
+
+##up until here everything seems fine, so the CpG names must go missing somewhere from here.##
+
+lambda.min = cvfit$lambda.min ## do I change this to out1$lambda.min?
+m = biglasso(X, y, lambda = lambda.min)
+
+# create dataframe with weights for each probe
+test = data.frame(coef.name = dimnames(coef(m))[[1]], coef.value = matrix(coef(m)))
+
+# only take predictors where the co-efficient value is not 0
+coef = test[test$coef.value!=0,]
+save(coef, file="/exports/eddie/scratch/s0951790/Lasso_coef_SIMD.RData") 
+
+#End R and save workspace
+q()
+y
+
+
+#Outside Eddie, in Terminal:  copy files to own computer
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_output_SIMD.RData /Users/andersjespersen/Documents/SIMD_EWAS/
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/Lasso_coef_SIMD.RData /Users/andersjespersen/Documents/SIMD_EWAS/
+  
+  
+  
+  
+#########################################################################################################################################  
   
 
 
-## Accessing and moving data in ALSPAC DNAm data folder on Eddie####
+###########   Accessing and moving data in ALSPAC DNAm data folder on Eddie    ###############
 
 ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
 qlogin -q staging #qlogin staging needed to access datastore
 cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas #change directory to the ALSPAC DNAm beta data path
-scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas/mvals.Robj exports/eddie/scratch/s0951790/ #Copy m-value file into scratch space
+scp /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/betas/mvals.Robj /exports/eddie/scratch/s0951790/ #Copy m-value file into scratch space
 
 cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/genomics/B3421/methylation/B3421/samplesheet #changing directory to samplesheet location
 scp ./data.Robj /exports/eddie/scratch/s0951790/ #copy samplesheet with timepoints to scratch space
-
+exit #closes the staging node
 
 qlogin -l h_vmem=128G #requesting more memory
 cd /exports/eddie/scratch/s0951790/ #changing directory to my scratch space
@@ -2661,21 +2907,21 @@ head(mvals_na) #viweing the first 6 lines of the mvals. Rows = CpG, columns = e.
 
 #Subset samplesheet so only rows with time_point FOM remains
 FOM_subset_samplesheet <- subset(samplesheet, time_point == 'FOM', select = c("Sample_Name", 
-                                                                            "cidB3421",
-                                                                            "QLET",
-                                                                            "Slide",
-                                                                            "sentrix_row",
-                                                                            "sentrix_col",
-                                                                            "time_code",
-                                                                            "time_point",
-                                                                            "Sex",
-                                                                            "BCD_plate",
-                                                                            "sample_type",
-                                                                            "additive",
-                                                                            "age",
-                                                                            "duplicate.rm",
-                                                                            "genotypeQCkids",
-                                                                            "genotypeQCmums"))
+                                                                              "cidB3421",
+                                                                              "QLET",
+                                                                              "Slide",
+                                                                              "sentrix_row",
+                                                                              "sentrix_col",
+                                                                              "time_code",
+                                                                              "time_point",
+                                                                              "Sex",
+                                                                              "BCD_plate",
+                                                                              "sample_type",
+                                                                              "additive",
+                                                                              "age",
+                                                                              "duplicate.rm",
+                                                                              "genotypeQCkids",
+                                                                              "genotypeQCmums"))
 
 
 #Subset columns in mvals_na that match cell values in FOM_subset_samplesheet$Sample_Name
@@ -2685,6 +2931,9 @@ FOM_mvals <- subset(mvals_na, select = c(Sample_Name))
 #save the subsetted cpg data-frame
 saveRDS(FOM_mvals, file = "FOM_mvals.rds")
 
+q()
+n
+
 
 ##creating the testing data (ALSPAC) phenotype file
 #It needs to include participant ID (cid...), phenotype (IMD score), and methylation ID (SLIDE.....).
@@ -2693,29 +2942,45 @@ ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
 qlogin -q staging #qlogin staging needed to access datastore
 cd /exports/igmm/datastore/GenScotDepression/data/ALSPAC/ #changing directory to where the phenotype file (Whalley_07May2021.dta) is
 scp ./Whalley_07May2021.dta /exports/eddie/scratch/s0951790/ #copying the phenotypefile to my scratch space
+cd /exports/eddie/scratch/s0951790 #changing directory to scratchspace
 module load igmm/apps/R/3.6.3 #loading R
 R #opening R
 install.packages("haven") #this package is needed to open a stata file in R
+69 #choosing a cloud to download the package from, 69 is UK Bristol
 library(haven)
 alspac_pheno <- read_dta("Whalley_07May2021.dta") #loading the phenotypefile into a dataframe callen alspac_pheno
-names(alspac_pheno)[1:10]
+alspac_pheno <- as.data.frame(alspac_pheno)
 alspac_pheno_IMD <- alspac_pheno[,c("cidB3421", "jan2014imd2010q5_M")]
+load("data.Robj")
 alspac_pheno_IMD <- merge (alspac_pheno_IMD, samplesheet[,c("Sample_Name", "cidB3421")], by = "cidB3421") #add methylation ID to the phenotype file
+#Crudely removing missing values (-1) in ALSPAC prediction:
+alspac_pheno_IMD <- subset(alspac_pheno_IMD, jan2014imd2010q5_M != -1, select = c("Sample_Name", "cidB3421", "jan2014imd2010q5_M"))
 saveRDS(alspac_pheno_IMD, file = "alspac_pheno_IMD.rds")
 
+q()
+n
+
+#outside of Eddie: copy alspac phenotype file to own harddrive
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/alspac_pheno_IMD.rds /Users/andersjespersen/Documents/SIMD_EWAS/
+  
+  
 
 ### Running the prediction lasso regression in the ALSPAC data
 
 #copy coefficient file onto scratch space from own computer
+scp /Users/andersjespersen/Documents/SIMD_EWAS/Lasso_coef_SIMD_w1.RData s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
 
-
+  scp /Users/andersjespersen/Documents/SIMD_EWAS/Lasso_output_SIMD_w1.RData s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
+  
 ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
 qlogin -l h_vmem=128G #requesting more memory
 cd /exports/eddie/scratch/s0951790/ #changing directory to my scratch space
-  module load igmm/apps/R/3.6.3 #loading R
-R #opening R
+  
+#Opening R
+module load igmm/apps/R/4.1.0
 
-#
+R
+
 
 #load the raw methylation data set (for mothers) in R
 data <- readRDS("FOM_mvals.rds")
@@ -2737,7 +3002,7 @@ meth1 = as.data.frame(meth)
 meth1$cidB3421 = as.character(rownames(meth1))
 
 
-load ("./Lasso_output_SIMD_w1.RData") #loading the list of CpGs and their weights (coefficients) that were created in the training set
+load ("./Lasso_coef_SIMD.RData") #loading the list of CpGs and their weights (coefficients) that were created in the training set
 
 #Don't know what this section does
 a = which(names(meth1) %in% coef$coef.name)
@@ -2760,14 +3025,164 @@ predicted_dep=colSums(b) + coef[1,2]
 pred_dep = as.data.frame(predicted_dep)
 pred_dep$ID = rownames(pred_dep)
 
-dep = merge(dep_test, pred_dep, by="ID")
+dep = merge(IMD_test, pred_dep, by.x = "Sample_Name",by.y="ID")
 
 #save the file to my scratch space
 save(dep, file = "/exports/eddie/scratch/s0951790/ALSPAC_pred_IMD.RData")
 
+#exit R
+q()
+
+#Out of Eddie, in Terminal: Save predicted IMD file to own computer
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/ALSPAC_pred_IMD.RData /Users/andersjespersen/Documents/SIMD_EWAS/
+  
+  
+####running a glm regression to test the association between the IMD decile and the predicted IMD from SIMD MRS
+setwd("/Users/andersjespersen/Documents/SIMD_EWAS/")
+ls()
+
+load("ALSPAC_pred_IMD.RData")
+IMD_pred <- dep
+
+lm_IMD <- lm(jan2014imd2010q5_M ~ predicted_dep, data = IMD_pred)
+summary(lm_IMD)
+
+#Call:
+#  lm(formula = jan2014imd2010q5_M ~ predicted_dep, data = IMD_pred)
+
+#Residuals:
+#  Min      1Q  Median      3Q     Max 
+#-1.4864 -1.1841 -0.2063  0.8203  2.9395 
+
+#Coefficients:
+#  Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)    2.4909225  0.1875034  13.285   <2e-16 ***
+#  predicted_dep -0.0003024  0.0001958  -1.544    0.123    
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 1.249 on 934 degrees of freedom
+#Multiple R-squared:  0.002546,	Adjusted R-squared:  0.001478 
+#F-statistic: 2.384 on 1 and 934 DF,  p-value: 0.1229
 
 
 
+############     Predicting from GS w1 into GS w3          ##################################
+
+#Create a w3 phenotype file that includes SIMD rank, participant ID and methylation ID.
+SIMD_pheno_w3 <- SIMD_lasso_pheno_w3[,c(1,3)]
+
+#rename gwas column to id
+colnames(SIMD_pheno_w3)[1] <- "id"
+
+#Add SMID rank
+SIMD_pheno_w3 <- merge(SIMD_pheno_w3, genscot_merged[,c("ID","rank")], by.x = "id", by.y = "ID")
+
+#Save file as SIMD_pheno_w3.rds
+saveRDS(SIMD_pheno_w3, file = "/Users/andersjespersen/Documents/SIMD_EWAS/SIMD_pheno_w3.rds")
+
+
+#Copy the file to Eddie scratch space, do this in terminal but NOT in eddie
+scp /Users/andersjespersen/Documents/SIMD_EWAS/SIMD_pheno_w3.rds s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
+
+
+
+## Running the prediction lasso regression in the ALSPAC data
+
+#copy coefficient file onto scratch space from own computer
+scp /Users/andersjespersen/Documents/SIMD_EWAS/Lasso_coef_SIMD_w1.RData s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/
+  
+  
+ssh s0951790@eddie.ecdf.ed.ac.uk #open Eddie shell
+qlogin -l h_vmem=128G #requesting more memory
+cd /exports/eddie/scratch/s0951790/ #changing directory to my scratch space
+module load igmm/apps/R/3.6.3 #loading R
+R #opening R
+
+#
+
+#load the raw methylation data set in R
+data <- read.table("all_450mvalues.txt")
+
+names(data) <- substring(names(data),2,20) #Don't know what this does
+
+#load the phenotype file
+w3_test <- readRDS("SIMD_pheno_w3.rds")
+
+#Don't know what this section does
+a = which(colnames(data) %in% w3_test$ID)
+meth = data[,a]
+rm(data)
+dat = meth
+rm(meth)
+meth = t(dat)
+rm(dat)
+meth1 = as.data.frame(meth)
+meth1$id = as.character(rownames(meth1))
+
+
+load ("./Lasso_coef_SIMD_w1.RData") #loading the list of CpGs and their weights (coefficients) that were created in the training set
+
+#Don't know what this section does
+a = which(names(meth1) %in% coef$coef.name) #Error in coef$coef.name : object of type 'closure' is not subsettable
+meth2 = meth1[,a]
+meth3 = t(meth2)
+probes <- intersect(coef$coef.name, rownames(meth3))
+rownames(coef) = coef$coef.name
+
+b = meth3[probes,]
+p = coef[probes,]
+
+
+#this section calculates the DNAm risk scores 
+#(a sum of the product of the coefficient weights derived from the LASSO regression and m-values)
+for (i in probes) {
+  b[i,]= b[i,]*p[i,"coef.value"]
+}
+
+predicted_dep=colSums(b) + coef[1,2]
+pred_dep = as.data.frame(predicted_dep)
+pred_dep$ID = rownames(pred_dep)
+
+dep = merge(w3_test, pred_dep, by="ID")
+
+#save the file to my scratch space
+save(dep, file = "/exports/eddie/scratch/s0951790/w3_pred_SIMD.RData")
+
+#exit R
+q()
+
+#Out of Eddie, in Terminal: Save predicted IMD file to own computer
+scp s0951790@eddie.ecdf.ed.ac.uk:/exports/eddie/scratch/s0951790/w3_pred_SIMD.RData /Users/andersjespersen/Documents/SIMD_EWAS/
+  
+
+####running a lm regression (not log because it's not binomial) to test the association between the recorded w3 SIMD and the predicted w3 SIMD from SIMD w1 MRS
+setwd("/Users/andersjespersen/Documents/SIMD_EWAS/")
+ls()
+load("w3_pred_SIMD.RData")
+View(dep)
+SIMD_w3_pred <- dep
+
+mod <- lm(rank~predicted_dep, data = SIMD_w3_pred)
+summary(mod)
+
+#Call:
+#  lm(formula = rank ~ predicted_dep, data = SIMD_w3_pred)
+
+#Residuals:
+#  Min      1Q  Median      3Q     Max 
+#-4333.1 -1324.8   473.8  1449.3  3082.5 
+
+#Coefficients:
+#  Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)   4017.3586    31.8029 126.321  < 2e-16 ***
+#  predicted_dep    2.5117     0.3689   6.809 1.15e-11 ***
+#  ---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 1787 on 3469 degrees of freedom
+#Multiple R-squared:  0.01319,	Adjusted R-squared:  0.0129 
+#F-statistic: 46.36 on 1 and 3469 DF,  p-value: 1.153e-11
 
 
 
